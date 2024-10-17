@@ -26,8 +26,8 @@ int temp_second[2] = {0};
 
 // {"mode : 0"}
 // mode가 0일때 시간, 분의 정보가 담겨 있는 변수
-int hour_0 = 20;
-int minute_0 = 03;
+int hour_0 = 0;
+int minute_0 = 0;
 int system_second = 0;
 
 // {"mode : 1"}
@@ -61,12 +61,12 @@ void tx0_str(unsigned char *str){
 // 포트 초기화 함수
 void port_init() {
 	tx0_str("[2.port_init]\r\n");
-    DDRA = 0xff;
-    DDRC = 0xff;
-    DDRG = 0xff;
-    DDRE = 0x00;
-	DDRD = 0x00;
-	DDRB = 0xff;
+    DDRA = 0xff; // led
+    DDRG = 0x0f; // fnd sel
+	DDRC = 0xff; // fnd data
+    DDRE = 0x00; // switch 4~7
+	DDRD = 0x00; // swich 0
+	DDRB |= (1<<4); //buzzer
 }
 
 // FND 제어 함수
@@ -92,7 +92,7 @@ void fnd_control(int second) {
 }
 
 // 인터럽트 초기화 함수
-void interrupt_init(){
+void interrupt_init(){ //인터럽트 0 ,4~7
 	tx0_str("[3. interrupt_init]\r\n");
 	EICRB = 0xaa;
 	EICRA = 0xff;
@@ -110,7 +110,7 @@ void fnd_clear(){
 // 인터럽트 동작 
 ISR(INT0_vect){
 	// 채터링 방지
-	_delay_ms(100);
+	_delay_ms(30);
 	EIFR = (1 << 1);
 	if ((PINE & (1 << PINE1)) == 0) {}
 		
@@ -130,16 +130,17 @@ ISR(INT0_vect){
 			}
 			break;
 	}
-	
 	if(TIMSK & (1<<TOIE0) != 0){
+		TIMSK &= ~(1<<TOIE0);
 		isTimer_set = 0;
 		isAlarm_set = 0;
-		TIMSK &= ~(1<<TOIE0);
+		temp_second[0] = 0;
+		temp_second[1] = 0;
 	}
 }
 ISR(INT4_vect){
 	// 채터링 방지
-	_delay_ms(50);
+	_delay_ms(30);
 	EIFR = (1 << 4);
 	if ((PINE & (1 << PINE4)) == 0) {}
 
@@ -151,7 +152,7 @@ ISR(INT4_vect){
 }
 ISR(INT5_vect){
 	// 채터링 방지
-	_delay_ms(100);
+	_delay_ms(30);
 	EIFR = (1 << 5);
 	if ((PINE & (1 << PINE5)) == 0) {}
 	
@@ -162,7 +163,7 @@ ISR(INT5_vect){
 }
 ISR(INT6_vect){
 	// 채터링 방지
-	_delay_ms(100);
+	_delay_ms(30);
 	EIFR = (1 << 6);
 	if ((PINE & (1 << PINE6)) == 0) {}
 	
@@ -183,49 +184,32 @@ ISR(TIMER0_OVF_vect){
 	PORTB^=1<<4;
 	TCNT0=17;
 }
-
-// 타이머1 초기화 함수
-void timer1_Nomalmode_init() {
-	tx0_str("[4.timer1_Nomalmode_init]\r\n");
-    TCCR1A = 0; // 일반 모드 설정
-    TCCR1B = (1 << WGM12) | (1 << CS12) | (1 << CS10); // CTC 모드, 프리스케일러 설정
-	TCNT1 = 0;
-    OCR1A = 15624; // 1초마다 비교
-    TIMSK |= (1 << OCIE1A); // 비교 매치 인터럽트 허용
+//타이머3 초기화 함수
+void timer3_Nomalmode_init() {
+	tx0_str("[5.timer3_Nomalmode_init]\r\n");
+	TCCR3A = 0; // 일반 모드 설정
+	TCCR3B = (1 << WGM32) | (1 << CS32) | (1 << CS30); // CTC 모드, 프리스케일러 설정
+	TCNT3 = 0;
+	OCR3A = 15624; // 1초마다 비교
+	ETIMSK |= (1 << OCIE3A); // 비교 매치 인터럽트 허용
 }
-// 타이머1 인터럽트 서비스 루틴
-ISR(TIMER1_COMPA_vect) {
-	static int repeat1A = 0;
-	repeat1A++;
-	if(repeat1A >= 60){
-		minute_0++; // 분 증가
-		repeat1A = 0;
+// 타이머3 인터럽트 서비스 루틴
+ISR(TIMER3_COMPA_vect){
+	static int repeat3A = 0;
+	repeat3A++;
+	if(repeat3A >= 60){
+		system_second++;	
+		repeat3A = 0;
 	}
 	
 	// 타이머 설정 완료시 하강 시작
 	if(isTimer_set == 1){
 		// 타이머 완료
 		if(--timer_second <= 0){
-			timer_second = 0;
-			temp_second[0] = 0;			
 			TIMSK |= (1<<TOIE0);
+			timer_second = 0;
+			temp_second[0] = 0;
 		}
-	}
-}
-
-// 타이머2 초기화 함수
-void timer2_Nomalmode_init(){
-	TCCR2 |= (1<<CS22)|(1<<CS20);
-	TCNT2=4;
-	TIMSK|=(1<<TOIE2);
-}
-// 타이머2 인터럽트 서비스 루틴
-ISR(TIMER2_OVF_vect){
-	static int repeat2=0;
-	TCNT2=4;
-	repeat2++;
-	if(repeat2>=62*1){
-		repeat2=0;
 	}
 }
 
@@ -247,6 +231,26 @@ unsigned short read_adc() {
 	else if(ADMUX == 1)	ADMUX = 0;
 	
 	return((unsigned short)adc_high << 8) | (unsigned short)adc_low;;
+}
+
+//* [설명서 알려주는 함수] *//
+void menu(){
+	tx0_str("#************* [ 설 명 서 ] ************#\r\n");
+	tx0_str("#\r\n");
+	tx0_str("# 1. 's'를 눌러 프로그램을 시작합니다.\r\n");
+	tx0_str("# 2. 스위치로 현재시간을 입력합니다.\r\n");
+	tx0_str("# 3. 스위치로 모드를 설정합니다.\r\n");
+	tx0_str("#  {sw1 : 타이머/알람 설정 및 끄기}\r\n");
+	tx0_str("#  {sw2 : mode1   sw3 : mode2   sw4 : mode3}\r\n");	
+	tx0_str("# mode1: 현재 시간을 띄어줌\r\n");
+	tx0_str("# mode2: 타이머 설정\r\n");
+	tx0_str("# mode3: 알람 설정\r\n");
+	tx0_str("# 4. 타이머/알람 조이스틱을 통해 시간을 정하여\r\n");
+	tx0_str("#    스위치 1번을 눌러서 설정.\r\n");
+	tx0_str("# 5. 부저가 울리면 스위치1번을 눌러서 끔.\r\n");
+	tx0_str("#\r\n");
+	tx0_str("# 주의사항 : 부저가 울려서 스위치1을 눌러서 끄면\r\n");
+	tx0_str("#           타이머,알람 설정한게 둘다 꺼짐\r\n");
 }
 
 //* [모드에 따른 함수] *//
@@ -337,20 +341,19 @@ int main(void) {
 	port_init(); // 포트 초기화	
 	interrupt_init(); // 인터럽트 초기화
 	timer0_Nomalmode_init(); // 터이머0 초기화
-   	timer1_Nomalmode_init(); // 타이머1 초기화
+   	timer3_Nomalmode_init(); // 타이머3 초기화
 	adc_init();	 // 아날로그 초기화
   	sei(); // 전역 인터럽트 허용
+	  
+	//s누르면 시작
+	//기본 설명서 알려주는 함수
 	
 	
+	system_second = hour_0*60 + minute_0;
 	
-	char asdf1[20];
-	char asd2[20];
-	
-
     while (1) {
 		switch (mode) { // 모드에 따른 동작 분기
             case 0:
-				system_second = hour_0*60 + minute_0;
 				//PORTA = 0x01;
                 Digital_Watch(); // 시계 알고리즘 호출
 				fnd_control(system_second); // FND 표시
@@ -375,11 +378,16 @@ int main(void) {
 				if(isAlarm_set == 0) fnd_control(temp_second[1]);
 				if(isAlarm_set == 1) fnd_control(alarm_second);
 				break;
+			case 3:
+				break;
+			default:
+				// 아무런 액션 없음
+				break;
         }
 		if(alarm_second == system_second){
-			PORTA = 0xff;
 			TIMSK |= (1<<TOIE0);
 			alarm_second = 0;
+			temp_second[1] = 0;
 		}
 	}
 }
