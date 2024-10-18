@@ -2,6 +2,17 @@
  * DigitalWatch.c
  *
  * Created: 2024-09-24 오후 1:52:08
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 2024/10/18 menu 함수 추가 , 's' 눌러서 시작 기능 추가, 
+ * 
  * Author : doyeon
  */ 
 #define F_CPU 16000000
@@ -20,14 +31,15 @@ int mode = 0;
 // {"공용 변수"}
 // 자리수를 나타내는 변수 (1: 초의 1자리, 2: 초의 10자리, 3: 분의 1자리, 4: 분의 10자리)
 int place = 1;
+int set_systemtime = 0; 
 volatile int tempX = 50;
 volatile int tempY = 30;
 int temp_second[2] = {0};
 
 // {"mode : 0"}
 // mode가 0일때 시간, 분의 정보가 담겨 있는 변수
-int hour_0 = 0;
-int minute_0 = 0;
+int hour_0 = 3;
+int minute_0 = 43;
 int system_second = 0;
 
 // {"mode : 1"}
@@ -56,6 +68,10 @@ void tx0_ch(unsigned char data)
 }
 void tx0_str(unsigned char *str){
 	while(*str){tx0_ch(*str++);}
+}
+char rx0_ch(){
+	while(!(UCSR0A & (1<<UDRE0)));
+	return UDR0;
 }
 
 // 포트 초기화 함수
@@ -114,6 +130,8 @@ ISR(INT0_vect){
 	EIFR = (1 << 1);
 	if ((PINE & (1 << PINE1)) == 0) {}
 		
+	set_systemtime = 1;	
+	
 	switch(mode){
 		// 모드가 1일때 누르면 하강 시작
 		case 1:
@@ -143,8 +161,15 @@ ISR(INT4_vect){
 	_delay_ms(30);
 	EIFR = (1 << 4);
 	if ((PINE & (1 << PINE4)) == 0) {}
-
-	mode = 0; // 모드 0 설정
+	
+	switch(set_systemtime){
+		case 0:
+			if(++hour_0 >= 24)	hour_0 = 24;
+			break;
+		case 1:
+			mode = 0; // 모드 0 설정
+			break;
+	}
 	
 	// fnd 끄기
 	fnd_clear();
@@ -156,7 +181,14 @@ ISR(INT5_vect){
 	EIFR = (1 << 5);
 	if ((PINE & (1 << PINE5)) == 0) {}
 	
-	mode = 1; // 모드 1 설정
+	switch(set_systemtime){
+		case 0:
+			if(--hour_0 <= 0)		hour_0 = 0;
+			break;
+		case 1:
+			mode = 1; // 모드 1 설정
+			break;
+	}
 	
 	// fnd 끄기
 	fnd_clear();
@@ -167,10 +199,32 @@ ISR(INT6_vect){
 	EIFR = (1 << 6);
 	if ((PINE & (1 << PINE6)) == 0) {}
 	
-	mode = 2; // 모드 2 설정
+	switch(set_systemtime){
+		case 0:
+			if(++minute_0 >= 60)	minute_0 = 60;
+			break;
+		case 1:
+			mode = 2; // 모드 2 설정
+			break;
+	}
 	
 	// fnd 끄기
 	fnd_clear();
+}
+ISR(INT7_vect){
+	// 채터링 방지
+	_delay_ms(30);
+	EIFR = (1 << 7);
+	if ((PINE & (1 << PINE7)) == 0) {}
+		
+	
+	switch(set_systemtime){
+		case 0:
+			if(--minute_0 <= 0) minute_0 = 0;
+		case 1:
+			mode = 3; // 모드 3 설정
+			break;
+	}
 }
 
 // 타이머0 초기화 함수
@@ -198,7 +252,7 @@ ISR(TIMER3_COMPA_vect){
 	static int repeat3A = 0;
 	repeat3A++;
 	if(repeat3A >= 60){
-		system_second++;	
+		system_second++;
 		repeat3A = 0;
 	}
 	
@@ -251,6 +305,9 @@ void menu(){
 	tx0_str("#\r\n");
 	tx0_str("# 주의사항 : 부저가 울려서 스위치1을 눌러서 끄면\r\n");
 	tx0_str("#           타이머,알람 설정한게 둘다 꺼짐\r\n");
+	tx0_str("#\r\n");
+	tx0_str("#\r\n");
+	tx0_str("# 's' 눌러서 시작\r\n");
 }
 
 //* [모드에 따른 함수] *//
@@ -311,24 +368,6 @@ void Time_set(int X, int Y,int mode){
 			break;
 	}
 }
-//* 디지털 시계 알고리즘 함수 (모드 : 0) *//
-void Digital_Watch() {
-	if (minute_0 >= 60) {
-		minute_0 = 0;
-		hour_0++;
-		if (hour_0 >= 24) {
-			hour_0 = 0;
-		}
-	}
-}
-//* 디지털 타이머 알고리즘 함수 (모드 : 1) *//
-void Digital_Timer(int X, int Y) {
-	Time_set(X,Y,mode);
-}
-//* 디지털 알람 시계 알고리즘 함수 (모드 : 2) *//
-void Digital_Alarm(int X, int Y){
-	Time_set(X,Y,mode);
-}
 
 //* 메인 함수 *//
 int main(void) {
@@ -344,18 +383,22 @@ int main(void) {
    	timer3_Nomalmode_init(); // 타이머3 초기화
 	adc_init();	 // 아날로그 초기화
   	sei(); // 전역 인터럽트 허용
-	  
-	//s누르면 시작
-	//기본 설명서 알려주는 함수
+	 
+	// 한글 안됌
+	menu();
+	while(rx0_ch() != 's'){}
 	
+	while(PIND & (1<<PIND0) != 0){
+		system_second = hour_0*60 + minute_0;
+		fnd_control(system_second);
+	}
 	
-	system_second = hour_0*60 + minute_0;
+	char asdf[20] = "";
 	
     while (1) {
 		switch (mode) { // 모드에 따른 동작 분기
             case 0:
 				//PORTA = 0x01;
-                Digital_Watch(); // 시계 알고리즘 호출
 				fnd_control(system_second); // FND 표시
                 break;
 			case 1:
@@ -364,7 +407,7 @@ int main(void) {
 					joystick_x = read_adc();
 					joystick_y = read_adc();
 				}
-				Digital_Timer(joystick_x,joystick_y);
+				Time_set(joystick_x,joystick_y,mode);
 				if(isTimer_set == 0) fnd_control(temp_second[0]);
 				if(isTimer_set == 1) fnd_control(timer_second);
 				break;
@@ -374,7 +417,7 @@ int main(void) {
 					joystick_x = read_adc();
 					joystick_y = read_adc();
 				}
-				Digital_Alarm(joystick_x,joystick_y);
+				Time_set(joystick_x,joystick_y,mode);
 				if(isAlarm_set == 0) fnd_control(temp_second[1]);
 				if(isAlarm_set == 1) fnd_control(alarm_second);
 				break;
@@ -386,6 +429,7 @@ int main(void) {
         }
 		if(alarm_second == system_second){
 			TIMSK |= (1<<TOIE0);
+			PORTB |= (0 << 4);
 			alarm_second = 0;
 			temp_second[1] = 0;
 		}
