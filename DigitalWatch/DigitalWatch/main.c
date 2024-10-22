@@ -3,15 +3,14 @@
  *
  * Created: 2024-09-24 오후 1:52:08
  * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 2024/10/18 menu 함수 추가 , 's' 눌러서 시작 기능 추가, 
+ * 2024/09/24	mode0의 현제 시간 fnd 출력
+ * 2024/10/01	mode1의 조이스틱 사용 테스트
+ * 2024/10/08
+ *		~
+ * 2024/10/13	코드 정리 및 Time_set함수 작성
+ * 2024/10/14	mode0,2 번 시간설정 함수 통합
+ * 2024/10/18	menu 함수 추가 , 's' 눌러서 시작 기능 추가
+ * 2024/10/22	menu 영어화, 현제 시간 통신으로 출력하기
  * 
  * Author : doyeon
  */ 
@@ -34,26 +33,24 @@ int place = 1;
 int set_systemtime = 0; 
 volatile int tempX = 50;
 volatile int tempY = 30;
+unsigned char str1[20];
 int temp_second[2] = {0};
 
 // {"mode : 0"}
 // mode가 0일때 시간, 분의 정보가 담겨 있는 변수
-int hour_0 = 3;
-int minute_0 = 43;
+int hour_0 = 0;
+int minute_0 = 0;
 int system_second = 0;
 
 // {"mode : 1"}
 // mode가 1때 시간, 분의 정보가 담겨 있는 변수
 int timer_second  = 0;
 int isTimer_set = 0;
-int isTimerBuzzer = 0;
 
 // {"mode : 2"}
 // mode가 2일때 시간, 분 정보가 담겨 있는 변수
 int alarm_second = 0;
-
 int isAlarm_set = 0;
-int isAlarmBuzzer = 0;
 
 //* [함수] *//
 // 통신 함수 초기화
@@ -128,7 +125,7 @@ ISR(INT0_vect){
 	// 채터링 방지
 	_delay_ms(30);
 	EIFR = (1 << 1);
-	if ((PINE & (1 << PINE1)) == 0) {}
+	if ((PIND & (1 << PIND1)) == 0) {}
 		
 	set_systemtime = 1;	
 	
@@ -254,6 +251,9 @@ ISR(TIMER3_COMPA_vect){
 	if(repeat3A >= 60){
 		system_second++;
 		repeat3A = 0;
+		
+		sprintf(str1,"Current Time : %02d:%02d\r",system_second/60,system_second%60);
+		tx0_str(str1);
 	}
 	
 	// 타이머 설정 완료시 하강 시작
@@ -289,25 +289,26 @@ unsigned short read_adc() {
 
 //* [설명서 알려주는 함수] *//
 void menu(){
-	tx0_str("#************* [ 설 명 서 ] ************#\r\n");
+	tx0_str("\r\n");
+	tx0_str("#************* [ INSTRUCTIONS ] ************#\r\n");
 	tx0_str("#\r\n");
-	tx0_str("# 1. 's'를 눌러 프로그램을 시작합니다.\r\n");
-	tx0_str("# 2. 스위치로 현재시간을 입력합니다.\r\n");
-	tx0_str("# 3. 스위치로 모드를 설정합니다.\r\n");
-	tx0_str("#  {sw1 : 타이머/알람 설정 및 끄기}\r\n");
-	tx0_str("#  {sw2 : mode1   sw3 : mode2   sw4 : mode3}\r\n");	
-	tx0_str("# mode1: 현재 시간을 띄어줌\r\n");
-	tx0_str("# mode2: 타이머 설정\r\n");
-	tx0_str("# mode3: 알람 설정\r\n");
-	tx0_str("# 4. 타이머/알람 조이스틱을 통해 시간을 정하여\r\n");
-	tx0_str("#    스위치 1번을 눌러서 설정.\r\n");
-	tx0_str("# 5. 부저가 울리면 스위치1번을 눌러서 끔.\r\n");
+	tx0_str("# 1. Press 's' to start the program.\r\n");
+	tx0_str("# 2. Use the switch to input the current time.\r\n");
+	tx0_str("# 3. Set the mode using the switch.\r\n");
+	tx0_str("#  {sw1: Set/Turn off Timer/Alarm}\r\n");
+	tx0_str("#  {sw2: mode1   sw3: mode2   sw4: mode3}\r\n");
+	tx0_str("# mode1: Displays the current time\r\n");
+	tx0_str("# mode2: Sets the timer\r\n");
+	tx0_str("# mode3: Sets the alarm\r\n");
+	tx0_str("# 4. Use the joystick to set the time for the\r\n");
+	tx0_str("#    Timer/Alarm and press switch 1 to confirm.\r\n");
+	tx0_str("# 5. When the buzzer sounds, press switch 1 to turn it off.\r\n");
 	tx0_str("#\r\n");
-	tx0_str("# 주의사항 : 부저가 울려서 스위치1을 눌러서 끄면\r\n");
-	tx0_str("#           타이머,알람 설정한게 둘다 꺼짐\r\n");
+	tx0_str("# Note: If you turn off the buzzer by pressing switch 1,\r\n");
+	tx0_str("#       both the timer and alarm settings will be turned off.\r\n");
 	tx0_str("#\r\n");
 	tx0_str("#\r\n");
-	tx0_str("# 's' 눌러서 시작\r\n");
+	tx0_str("# Press 's' to start\r\n");
 }
 
 //* [모드에 따른 함수] *//
@@ -383,18 +384,22 @@ int main(void) {
    	timer3_Nomalmode_init(); // 타이머3 초기화
 	adc_init();	 // 아날로그 초기화
   	sei(); // 전역 인터럽트 허용
-	 
-	// 한글 안됌
+	
 	menu();
 	while(rx0_ch() != 's'){}
+	tx0_str("System Start...\r\n");
 	
-	while(PIND & (1<<PIND0) != 0){
+	while(1){
 		system_second = hour_0*60 + minute_0;
 		fnd_control(system_second);
+		if(PIND & (1<<PIND0) != 0) break;
 	}
 	
-	char asdf[20] = "";
+	tx0_str("\r\n");
+	sprintf(str1,"Current Time : %02d:%02d \r",hour_0,minute_0);
+	tx0_str(str1);
 	
+	mode = 0;
     while (1) {
 		switch (mode) { // 모드에 따른 동작 분기
             case 0:
@@ -421,12 +426,19 @@ int main(void) {
 				if(isAlarm_set == 0) fnd_control(temp_second[1]);
 				if(isAlarm_set == 1) fnd_control(alarm_second);
 				break;
-			case 3:
-				break;
 			default:
-				// 아무런 액션 없음
+				//d
+				PORTG = 0x04;
+				PORTC = ~0x5e;
+				_delay_ms(1);
+				//y
+				PORTG = 0x08;
+				PORTC = ~0x6e;
+				_delay_ms(1);
 				break;
         }
+		
+		// 알람설정 시간과 현제시간이 같을때 부저울리기
 		if(alarm_second == system_second){
 			TIMSK |= (1<<TOIE0);
 			PORTB |= (0 << 4);
@@ -435,8 +447,3 @@ int main(void) {
 		}
 	}
 }
-
-/*
- *[Todo list]*
-
-*/
