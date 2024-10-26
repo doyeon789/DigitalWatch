@@ -73,11 +73,12 @@ char rx0_ch(){
 
 // 포트 초기화 함수
 void port_init() {
+	
 	tx0_str("[2.port_init]\r\n");
-    DDRA = 0xff; // led
-    DDRG = 0x0f; // fnd sel
+    	DDRA = 0xff; // led
+    	DDRG = 0x0f; // fnd sel
 	DDRC = 0xff; // fnd data
-    DDRE = 0x00; // switch 4~7
+    	DDRE = 0x00; // switch 4~7
 	DDRD = 0x00; // swich 0
 	DDRB |= (1<<4); //buzzer
 }
@@ -87,21 +88,21 @@ void fnd_control(int second) {
 	int hour = second/60;
 	int minute = second%60;
 	
-    PORTG = fnd_sel[0];
-    PORTC = ~fnd_data[hour / 10];
-    _delay_ms(1);
+    	PORTG = fnd_sel[0];
+   	PORTC = ~fnd_data[hour / 10];
+   	_delay_ms(1);
     
-    PORTG = fnd_sel[1];
-    PORTC = ~fnd_data[hour % 10] + 128;
-    _delay_ms(1);
+ 	PORTG = fnd_sel[1];
+ 	PORTC = ~fnd_data[hour % 10] + 128;
+  	_delay_ms(1);
     
-    PORTG = fnd_sel[2];
-    PORTC = ~fnd_data[minute / 10];
-    _delay_ms(1);
+   	PORTG = fnd_sel[2];
+    	PORTC = ~fnd_data[minute / 10];
+    	_delay_ms(1);
     
-    PORTG = fnd_sel[3];
-    PORTC = ~fnd_data[minute % 10];
-    _delay_ms(1);
+    	PORTG = fnd_sel[3];
+    	PORTC = ~fnd_data[minute % 10];
+   	 _delay_ms(1);
 }
 
 // 인터럽트 초기화 함수
@@ -401,42 +402,42 @@ int main(void) {
 	
 	mode = 0;
     while (1) {
-		switch (mode) { // 모드에 따른 동작 분기
-            case 0:
-				//PORTA = 0x01;
-				fnd_control(system_second); // FND 표시
-                break;
-			case 1:
-				//PORTA = 0x02;
-				if(isTimer_set == 0){
-					joystick_x = read_adc();
-					joystick_y = read_adc();
-				}
-				Time_set(joystick_x,joystick_y,mode);
-				if(isTimer_set == 0) fnd_control(temp_second[0]);
-				if(isTimer_set == 1) fnd_control(timer_second);
-				break;
+	switch (mode) { // 모드에 따른 동작 분기
+            	case 0:
+			//PORTA = 0x01;
+			fnd_control(system_second); // FND 표시
+	                break;
+		case 1:
+			//PORTA = 0x02;
+			if(isTimer_set == 0){
+				joystick_x = read_adc();
+				joystick_y = read_adc();
+			}
+			Time_set(joystick_x,joystick_y,mode);
+			if(isTimer_set == 0) fnd_control(temp_second[0]);
+			if(isTimer_set == 1) fnd_control(timer_second);
+			break;
             case 2:
-				//PORTA = 0x04;
-				if(isAlarm_set == 0){
-					joystick_x = read_adc();
-					joystick_y = read_adc();
-				}
-				Time_set(joystick_x,joystick_y,mode);
-				if(isAlarm_set == 0) fnd_control(temp_second[1]);
-				if(isAlarm_set == 1) fnd_control(alarm_second);
-				break;
+			//PORTA = 0x04;
+			if(isAlarm_set == 0){
+				joystick_x = read_adc();
+				joystick_y = read_adc();
+			}
+			Time_set(joystick_x,joystick_y,mode);
+			if(isAlarm_set == 0) fnd_control(temp_second[1]);
+			if(isAlarm_set == 1) fnd_control(alarm_second);
+			break;
 			default:
-				//d
-				PORTG = 0x04;
-				PORTC = ~0x5e;
-				_delay_ms(1);
-				//y
-				PORTG = 0x08;
-				PORTC = ~0x6e;
-				_delay_ms(1);
-				break;
-        }
+			//d
+			PORTG = 0x04;
+			PORTC = ~0x5e;
+			_delay_ms(1);
+			//y
+			PORTG = 0x08;
+			PORTC = ~0x6e;
+			_delay_ms(1);
+			break;
+       		}
 		
 		// 알람설정 시간과 현제시간이 같을때 부저울리기
 		if(alarm_second == system_second){
