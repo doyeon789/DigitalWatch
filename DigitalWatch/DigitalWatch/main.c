@@ -19,38 +19,34 @@
 #include <avr/interrupt.h>
 #include <util/delay.h>
 
-//* [변수 설정] *//
-// fnd 동작을 위한 변수
-unsigned char fnd_sel[] = {0x01, 0x02, 0x04, 0x08};
-unsigned char fnd_data[] = {0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x6f};
-
-// 동작 모드 설정 (기본 모드  : 0)
-int mode = 0;
-
+//* [전역 변수 설정] *//
 // {"공용 변수"}
-// 자리수를 나타내는 변수 (1: 초의 1자리, 2: 초의 10자리, 3: 분의 1자리, 4: 분의 10자리)
-int place = 1;
-int set_systemtime = 0; 
-volatile int tempX = 50;
-volatile int tempY = 30;
-unsigned char str1[20];
-int temp_second[2] = {0};
+unsigned char fnd_sel[] = {0x01, 0x02, 0x04, 0x08};		// fnd 동작을 위한 변수
+unsigned char fnd_data[] = {0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x6f};
+int mode = 0;				// 동작 모드 설정 (기본 모드  : 0)
+int place = 1;				// 자리수를 나타내는 변수 (1: 초의 1자리, 2: 초의 10자리, 3: 분의 1자리, 4: 분의 10자리)
+int set_systemtime = 0;		// 초기 시간을 정하는 변수
+int tempX = 50;				// 입력 지연을 위한 변수 1
+int tempY = 30;				// 입력 지연을 위한 변수 2
+unsigned char str1[20];		// 통신을 출력을 위한 문자열 변수
+int temp_second[2] = {0};	// 타이머/알람의 시간을 설정하고 저장하는 변수
 
 // {"mode : 0"}
 // mode가 0일때 시간, 분의 정보가 담겨 있는 변수
-int hour_0 = 0;
-int minute_0 = 0;
-int system_second = 0;
+int hour_0 = 0;				// system_second에 저장될 시간 변수
+int minute_0 = 0;			// system_second에 저장될 분 변수
+int system_second = 0;		// set_systemtime으로 부터 시작하는 프로그램의 현제시간 변수
 
 // {"mode : 1"}
 // mode가 1때 시간, 분의 정보가 담겨 있는 변수
-int timer_second  = 0;
-int isTimer_set = 0;
+int timer_second  = 0;		// temp_second[0]에서 받아올 타이머 변수
+int isTimer_set = 0;		// 타이머 설정이 완료되었는지 확인하는 변수
 
 // {"mode : 2"}
 // mode가 2일때 시간, 분 정보가 담겨 있는 변수
-int alarm_second = 0;
-int isAlarm_set = 0;
+int alarm_second = 0;		// temp_second[1]에서 받아올 타이머 변수
+int isAlarm_set = 0;		// 알람 설정이 와료되었는지 확인하는 변수
+
 
 //* [함수] *//
 // 통신 함수 초기화
